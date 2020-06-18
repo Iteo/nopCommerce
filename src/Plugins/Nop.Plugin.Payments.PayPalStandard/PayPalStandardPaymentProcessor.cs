@@ -186,7 +186,7 @@ namespace Nop.Plugin.Payments.PayPalStandard
                 ["custom"] = postProcessPaymentRequest.Order.OrderGuid.ToString(),
 
                 //PDT, IPN and cancel URL
-                ["return"] = $"{storeLocation}Plugins/PaymentPayPalStandard/PDTHandler",
+                ["return"] = $"{storeLocation}Plugins/PaymentPayPalStandard/PDTHandler?orderGuid={postProcessPaymentRequest.Order.OrderGuid}",
                 ["notify_url"] = $"{storeLocation}Plugins/PaymentPayPalStandard/IPNHandler",
                 ["cancel_return"] = $"{storeLocation}Plugins/PaymentPayPalStandard/CancelOrder",
 

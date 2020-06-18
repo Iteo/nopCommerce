@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Orders;
@@ -334,12 +335,26 @@ namespace Nop.Plugin.Payments.PayPalStandard.Controllers
             return Json(new { Result = string.Empty });
         }
 
+        [IgnoreAntiforgeryToken]
         public IActionResult PDTHandler()
         {
             var tx = _webHelper.QueryString<string>("tx");
 
             if (!(_paymentPluginManager.LoadPluginBySystemName("Payments.PayPalStandard") is PayPalStandardPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor))
                 throw new NopException("PayPal Standard module cannot be loaded");
+
+            // In case PDT is disabled in PayPal "tx" is null, so we return to CheckoutCompleted
+            if (string.IsNullOrEmpty(tx))
+            {
+                var orderGuid = _webHelper.QueryString<string>("orderGuid");
+                if (Guid.TryParse(orderGuid, out var orderGuidNumber))
+                {
+                    var order = _orderService.GetOrderByGuid(orderGuidNumber);
+                    if (order != null)
+                        return RedirectToRoute("CheckoutCompleted", new { orderId = order.Id });
+                }
+                return RedirectToAction("Index", "Home", new { area = string.Empty });    
+            }
 
             if (processor.GetPdtDetails(tx, out var values, out var response))
             {
@@ -476,17 +491,14 @@ namespace Nop.Plugin.Payments.PayPalStandard.Controllers
             }
         }
 
-        public IActionResult IPNHandler()
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> IPNHandler()
         {
-            byte[] parameters;
-
-            using (var stream = new MemoryStream())
+            string strRequest = "";
+            using (var stream = new StreamReader(Request.Body))
             {
-                Request.Body.CopyTo(stream);
-                parameters = stream.ToArray();
+                strRequest = await stream.ReadToEndAsync();
             }
-
-            var strRequest = Encoding.ASCII.GetString(parameters);
 
             if (!(_paymentPluginManager.LoadPluginBySystemName("Payments.PayPalStandard") is PayPalStandardPaymentProcessor processor) || !_paymentPluginManager.IsPluginActive(processor))
                 throw new NopException("PayPal Standard module cannot be loaded");
